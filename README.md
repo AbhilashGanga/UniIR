@@ -11,7 +11,7 @@ Information Retrievers](https://arxiv.org/pdf/2311.17136.pdf)"
 - **🔥[2023-12-21]: Our [🤗 M-BEIR Benchmark](https://huggingface.co/datasets/TIGER-Lab/M-BEIR) is now available for use.**
 
 
-## Introduction
+## Introductionn
 We propose the **UniIR**(Universal multimodal Information Retrieval) **framework** to learn a single retriever to accomplish (possibly) any retrieval task. Unlike traditional IR systems, UniIR needs to follow the instructions to take a heterogeneous query to retrieve from a heterogeneous candidate pool with millions of candidates in diverse modalities.
 
 <img src="docs/images/uniir_teaser.jpg" alt="UniIR Teaser" style="width:80%;">
