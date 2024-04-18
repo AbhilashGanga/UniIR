@@ -83,6 +83,22 @@ def build_model_from_config(config):
         assert os.path.exists(checkpoint_path), f"Checkpoint file {checkpoint_path} does not exist."
         print(f"loading CLIPScoreFusion checkpoint from {checkpoint_path}")
         model.load_state_dict(torch.load(checkpoint_path)["model"])
+    elif model_name == "FlavaScoreFusion":
+        from models.uniir_flava.flava_scorefusion.flava_sf import FlavaScoreFusion
+
+        model_config = config.model
+        uniir_dir = config.uniir_dir
+        download_root = os.path.join(uniir_dir, model_config.pretrained_clip_model_dir)
+
+        model = FlavaScoreFusion(model_name = model_config.clip_vision_model_name, download_root=download_root)
+        model.float()
+        # Load model from checkpoint
+        #ckpt_config = model_config.ckpt_config
+        #checkpoint_path = os.path.join(config.uniir_dir, ckpt_config.ckpt_dir, ckpt_config.ckpt_name)
+        #assert os.path.exists(checkpoint_path), f"Checkpoint file {checkpoint_path} does not exist."
+        #print(f"loading FlavaFeatureFusion checkpoint from {checkpoint_path}")
+        #model.load_state_dict(torch.load(checkpoint_path)["model"])
+
 
     elif model_name == "CLIPFeatureFusion":
         from models.uniir_clip.clip_featurefusion.clip_ff import CLIPFeatureFusion

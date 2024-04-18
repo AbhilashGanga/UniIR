@@ -249,6 +249,10 @@ def run_retrieval(config):
             metric_names_list = getattr(retrieval_dataset_config, "correspond_metrics_name", None)
             dataset_embed_dir = os.path.join(uniir_dir, embed_dir_name, expt_dir_name, split_name)
             splits.append((split_name, dataset_embed_dir, dataset_name_list, cand_pool_name_list, qrel_name_list, metric_names_list))
+            print(dataset_name_list)
+            print(cand_pool_name_list)
+            print(qrel_name_list)
+            print(metric_names_list)
             assert len(dataset_name_list) == len(cand_pool_name_list) == len(
                 qrel_name_list) == len(metric_names_list), "Mismatch between datasets and candidate pools and qrels."
 
