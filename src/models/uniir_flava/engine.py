@@ -73,7 +73,11 @@ def eval_engine(model, data_loader, gpu_id, config):
         for key in batch:
             if isinstance(batch[key], torch.Tensor):
                 batch[key] = batch[key].to(gpu_id, non_blocking=True)  # Batch is a dictionary of tensors
-
+            for k in batch[key]:
+                # print(k)
+                if key=='txt_batched' or key=='image_batched' or key=='txt_mask_batched' or key=='image_mask_batched':
+                    if type(k)==str:
+                        batch[key][k] = batch[key][k].to(gpu_id, non_blocking=True)
         # autocast for mixed precision
         with autocast():
             outputs = model(batch)
