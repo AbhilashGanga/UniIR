@@ -93,11 +93,11 @@ def build_model_from_config(config):
         model = FlavaScoreFusion(model_name = model_config.clip_vision_model_name, download_root=download_root)
         model.float()
         # Load model from checkpoint
-        #ckpt_config = model_config.ckpt_config
-        #checkpoint_path = os.path.join(config.uniir_dir, ckpt_config.ckpt_dir, ckpt_config.ckpt_name)
-        #assert os.path.exists(checkpoint_path), f"Checkpoint file {checkpoint_path} does not exist."
-        #print(f"loading FlavaFeatureFusion checkpoint from {checkpoint_path}")
-        #model.load_state_dict(torch.load(checkpoint_path)["model"])
+        ckpt_config = model_config.ckpt_config
+        checkpoint_path = os.path.join(config.uniir_dir, ckpt_config.ckpt_dir, ckpt_config.ckpt_name)
+        assert os.path.exists(checkpoint_path), f"Checkpoint file {checkpoint_path} does not exist."
+        print(f"loading FlavaFeatureFusion checkpoint from {checkpoint_path}")
+        model.load_state_dict(torch.load(checkpoint_path)["model"])
 
 
     elif model_name == "CLIPFeatureFusion":
