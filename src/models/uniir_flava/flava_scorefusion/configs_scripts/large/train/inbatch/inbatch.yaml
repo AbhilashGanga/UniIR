@@ -12,12 +12,12 @@ data_config:
   val_query_data_path: query/union_val/mbeir_union_val.jsonl
 dataloader_config:
   num_workers: 5
-  train_batch_size: 64
-  valid_batch_size: 16
+  train_batch_size: 180
+  valid_batch_size: 180
 dist_config:
   dist_url: env://
 evaluator:
-  enable_eval: false
+  enable_eval: true
   eval_freq: 1
   print_freq: 10
 experiment:
@@ -36,7 +36,7 @@ model:
   clip_vision_model_name: ViT-L/14
   gather_embeddings: true
   name: FlavaScoreFusion
-  pretrained_clip_model_dir: checkpoint/CLIP/
+  pretrained_clip_model_dir: checkpoint/FLAVA/
   short_name: FLAVA_SF
   size: Large
 seed: 2023
@@ -45,7 +45,7 @@ trainer_config:
   gradient_accumulation_steps: 1
   learning_rate: 1e-5
   num_train_epochs: 20
-  print_freq: 50
+  print_freq: 10
   warmup_steps: 0
 wandb_config:
   enabled: true

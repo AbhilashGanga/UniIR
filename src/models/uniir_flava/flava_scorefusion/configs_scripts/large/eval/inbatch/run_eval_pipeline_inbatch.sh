@@ -3,19 +3,17 @@
 set -e  # Exit immediately if a command exits with a non-zero status
 
 # Initialize Conda
-source /opt/conda/etc/profile.d/conda.sh # <--- Change this to the path of your conda.sh
+source /burg/opt/anaconda3-2022.05/etc/profile.d/conda.sh # <--- Change this to the path of your conda.sh
 
-UNIIRHOME="/home/ma4496/"
 # Path to the codebase and config file
-SRC="$UNIIRHOME/UniIR/src"  # Absolute path to codebse /UniIR/src # <--- Change this to the path of your UniIR/src
+SRC="/burg/dsi/users/nd2794/mmir/UniIR/src"  # Absolute path to codebse /UniIR/src # <--- Change this to the path of your UniIR/src
 
 # Path to common dir
 COMMON_DIR="$SRC/common"
 
-
 # Path to MBEIR data and UniIR directory where we store the checkpoints, embeddings, etc.
-UNIIR_DIR="$UNIIRHOME/UniIR/UniIR" # <--- Change this to the UniIR directory
-MBEIR_DATA_DIR="$UNIIRHOME/M-BEIR/" # <--- Change this to the MBEIR data directory you download from HF page
+UNIIR_DIR="/burg/dsi/users/nd2794/mmir" # <--- Change this to the UniIR directory (checkpoints)
+MBEIR_DATA_DIR="/burg/dsi/users/nd2794/mmir/M-BEIR" # <--- Change this to the MBEIR data directory you download from HF page (data)
 
 # Path to config dir
 MODEL="uniir_flava/flava_scorefusion"  # <--- Change this to the model you want to run
@@ -26,8 +24,8 @@ EXP_NAME="inbatch"
 CONFIG_DIR="$MODEL_DIR/configs_scripts/$SIZE/$MODE/$EXP_NAME"
 
 # Set CUDA devices and PYTHONPATH
-export CUDA_VISIBLE_DEVICES=0  # <--- Change this to the CUDA devices you want to use
-NPROC=1 # <--- Change this to the number of GPUs you want to use
+export CUDA_VISIBLE_DEVICES=0,1  # <--- Change this to the CUDA devices you want to use
+NPROC=2 # <--- Change this to the number of GPUs you want to use
 export PYTHONPATH=$SRC
 echo "PYTHONPATH: $PYTHONPATH"
 echo  "CUDA_VISIBLE_DEVICES: $CUDA_VISIBLE_DEVICES"
@@ -37,7 +35,7 @@ cd $COMMON_DIR
 
 # Activate conda environment
 # conda activate clip
-conda activate uniir # <--- Change this to the name of your conda environment
+conda activate /burg/dsi/users/nd2794/mmir/envs/uniir # <--- Change this to the name of your conda environment
 
 # Run Embedding command
 CONFIG_PATH="$CONFIG_DIR/embed.yaml"
@@ -56,7 +54,7 @@ python -m torch.distributed.run --nproc_per_node=$NPROC $SCRIPT_NAME \
     --mbeir_data_dir "$MBEIR_DATA_DIR"
 
 # Activate faiss environment
-conda activate faiss # <--- Change this to the name of your conda environment
+conda activate /burg/dsi/users/nd2794/mmir/envs/faiss # <--- Change this to the name of your conda environment
 
 # Run Index command
 CONFIG_PATH="$CONFIG_DIR/index.yaml"

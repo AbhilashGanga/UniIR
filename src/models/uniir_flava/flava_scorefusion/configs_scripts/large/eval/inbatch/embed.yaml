@@ -8,7 +8,7 @@ data_config:
   train_dir_name: query/train
   val_dir_name: query/val
 dataloader_config:
-  batch_size: 256
+  batch_size: 1024
   num_workers: 4
 dist_config:
   dist_url: env://
@@ -18,6 +18,19 @@ embed_config:
     - visualnews_task0
     - mscoco_task0_test
     - fashion200k_task0
+    - webqa_task1
+    - edis_task2
+    - webqa_task2
+    - visualnews_task3
+    - mscoco_task3_test
+    - fashion200k_task3
+    - nights_task4
+    - oven_task6
+    - infoseek_task6
+    - fashioniq_task7
+    - cirr_task7
+    - oven_task8
+    - infoseek_task8
     embed_union_pool: true
     enable_embed: true
   embed_dir_name: embed
@@ -26,10 +39,36 @@ embed_config:
     - visualnews_task0
     - mscoco_task0_test
     - fashion200k_task0
+    - webqa_task1
+    - edis_task2
+    - webqa_task2
+    - visualnews_task3
+    - mscoco_task3_test
+    - fashion200k_task3
+    - nights_task4
+    - oven_task6
+    - infoseek_task6
+    - fashioniq_task7
+    - cirr_task7
+    - oven_task8
+    - infoseek_task8
     datasets_name:
     - visualnews_task0
     - mscoco_task0
     - fashion200k_task0
+    - webqa_task1
+    - edis_task2
+    - webqa_task2
+    - visualnews_task3
+    - mscoco_task3
+    - fashion200k_task3
+    - nights_task4
+    - oven_task6
+    - infoseek_task6
+    - fashioniq_task7
+    - cirr_task7
+    - oven_task8
+    - infoseek_task8
     enable_embed: true
   train_datasets_config:
     correspond_cand_pools_name: null
@@ -48,10 +87,10 @@ experiment:
 model:
   ckpt_config:
     ckpt_dir: checkpoint/${experiment.path_suffix}
-    ckpt_name: flava_sf_large.pth
+    ckpt_name: flava_sf_epoch_5.pth
   clip_vision_model_name: ViT-L/14
   name: FlavaScoreFusion
-  pretrained_clip_model_dir: checkpoint/Flava/
-  short_name: Flava_SF
+  pretrained_clip_model_dir: checkpoint/CLIP/
+  short_name: FLAVA_SF
   size: Large
 seed: 2023

@@ -54,7 +54,7 @@ def create_optimizer(gain_or_bias_params, rest_params, frozen_params, config):
     return optim.AdamW(
         [
             {"params": gain_or_bias_params, "weight_decay": 0.0,"lr":config.trainer_config.learning_rate},
-            {"params": rest_params, "weight_decay": 0.2,"lr":config.trainer_config.learning_rate},
+            {"params": rest_params, "weight_decay": 0.01,"lr":config.trainer_config.learning_rate},
             {"params": frozen_params, "lr":0.0}
         ],
         betas=(0.9, 0.98),
