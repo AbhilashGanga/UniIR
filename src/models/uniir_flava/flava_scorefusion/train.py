@@ -47,7 +47,9 @@ def set_seed(seed):
 
 def filter_parameters(model, condition_fn):
     named_parameters = model.named_parameters()
-    return [p for n, p in named_parameters if condition_fn(n, p) and p.requires_grad and (n.startswith("model.multimodal_model") or n.startswith("model.image_to_mm_projection") or n.startswith("model.text_to_mm_projection"))]
+    # return [p for n, p in named_parameters if condition_fn(n, p) and p.requires_grad and (n.startswith("model.multimodal_model") or n.startswith("model.image_to_mm_projection") or n.startswith("model.text_to_mm_projection"))]
+    return [p for n, p in named_parameters if condition_fn(n, p) and p.requires_grad]
+
 
 
 def create_optimizer(gain_or_bias_params, rest_params, frozen_params, config):
@@ -195,12 +197,12 @@ def main(config):
     # Apply different optimization strategies to different parameters
     # This is adapted from the UniVL-DR codebase
     frozen_params = []
-    for n,p in model.named_parameters():
-        if not (n.startswith("model.multimodal_model") or n.startswith("model.image_to_mm_projection") or n.startswith("model.text_to_mm_projection")):
-            frozen_params.append(p)
-            print(n)
-    for p in frozen_params:
-        p.requires_grad = False
+    # for n,p in model.named_parameters():
+    #     if not (n.startswith("model.multimodal_model") or n.startswith("model.image_to_mm_projection") or n.startswith("model.text_to_mm_projection")):
+    #         frozen_params.append(p)
+    #         print(n)
+    # for p in frozen_params:
+    #     p.requires_grad = False
     exclude_condition = lambda n, p: p.ndim < 2 or any(sub in n for sub in ["bn", "layernorm", "bias", "logit_scale"])
     include_condition = lambda n, p: not exclude_condition(n, p)
     gain_or_bias_params = filter_parameters(model, exclude_condition)
