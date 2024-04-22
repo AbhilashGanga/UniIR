@@ -475,7 +475,7 @@ class MBEIRCandidatePoolCollator(MBEIRCollatorBase):
             padded_txt, txt_mask = self._get_padded_text_with_mask(txt)
             padded_img, img_mask = self._get_padded_image_with_mask(img)
             txt_list.append(padded_txt)
-            if 'pixel_values' in padded_img:
+            if hasattr(padded_img, 'pixel_values'):
                 padded_img = torch.tensor(np.array(padded_img['pixel_values'])).squeeze(0)
                 
             img_list.append(padded_img)
