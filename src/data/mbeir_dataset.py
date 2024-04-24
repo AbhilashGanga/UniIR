@@ -136,7 +136,7 @@ class MBEIRMainDataset(MBEIRDatasetBase):
         self.select_cand = self._get_random_cand if self.shuffle_cand else self._get_first_cand
         self.enable_query_instruct = enable_query_instruct
         self.hard_neg_num = hard_neg_num
-        self.enable_instruct_fusion = self.enable_instruct_fusion
+        self.enable_instruct_fusion = enable_instruct_fusion
 
         returns = {} if returns is None else returns
         self.returns = {
@@ -412,6 +412,7 @@ class MBEIRMainCollator(MBEIRCollatorBase):
                 instance_keys.extend(["neg_cand_list"])
 
         # Generate Index Mapping
+        
         counter = 0
         for inst_idx, instance in enumerate(batch):
             for instance_key in instance_keys:
@@ -424,7 +425,7 @@ class MBEIRMainCollator(MBEIRCollatorBase):
 
                     index_mapping[instance_key][inst_idx].append(counter)  # Track current index
                     counter += 1
-                    if "prompt" in item:
+                    if "prompt" in item and instance_key == "query":
                         txt = item["txt_without_prompt"]
                         prompt = item["prompt"]
                         padded_prompt, prompt_mask = self._get_padded_text_with_mask(prompt)
@@ -507,7 +508,6 @@ class MBEIRCandidatePoolCollator(MBEIRCollatorBase):
             did = instance.get("did", None)
             if did is not None:
                 did_list.append(did)
-        print(self.tokenizer)
         if isinstance(self.tokenizer, AutoTokenizer):
             processed_batch = {
                 "txt_batched": self.tokenizer(txt_list, max_length=77, truncation=True, padding=True,return_tensors='pt'),

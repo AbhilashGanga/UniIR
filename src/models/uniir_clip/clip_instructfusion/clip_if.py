@@ -4,20 +4,32 @@ Code adapted from OpenAI's CLIP codebase
 """
 
 import torch
+import math
 from torch import nn
 import torch.nn.functional as F
-import clip
+from transformers import CLIPProcessor, CLIPTextModel, CLIPVisionModelWithProjection, AutoProcessor
 import torch.distributed.nn
 
 
 class CLIPInstructFusion(nn.Module):
     def __init__(self, model_name="ViT-B/32", device="cuda", jit=False, download_root=None, config=None):
         super().__init__()
-
+        self.clip_txt_model = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14")
+        self.clip_img_model = CLIPVisionModelWithProjection.from_pretrained("openai/clip-vit-large-patch14")
+        processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
         # Load pre-trained CLIP model
-        self.clip_model, self.img_preprocess_fn = clip.load(model_name, device, jit, download_root=download_root)
-        self.tokenizer = clip.tokenize
+        # self.clip_model, self.img_preprocess_fn = clip.load(model_name, device, jit, download_root=download_root)
+        self.tokenizer = processor.tokenizer
+        self.img_preprocess_fn = processor.image_processor
         self.loss_function = nn.CrossEntropyLoss()
+        HIDDEN_SIZE = 768
+        num_mm_heads = 8
+        num_mm_layers = 6
+        encoder_layer = torch.nn.TransformerEncoderLayer(d_model=HIDDEN_SIZE, nhead=num_mm_heads, batch_first=True, activation="gelu")
+        self.fusion_encoder = torch.nn.TransformerEncoder(encoder_layer, num_layers=num_mm_layers)
+        self.cls_token = torch.nn.Parameter(torch.zeros(1, 1, HIDDEN_SIZE))
+        self.embed_token = torch.nn.Parameter(torch.zeros(1, 1, HIDDEN_SIZE))
+
         if config is not None:
             self.gather_embeddings = config.model.gather_embeddings
             self.in_batch_neg_num = config.data_config.in_batch_neg_num
@@ -28,16 +40,11 @@ class CLIPInstructFusion(nn.Module):
     def get_tokenizer(self):
         def tokenizer_wrapper(txt):
             tokenizer = self.tokenizer
-            txt_tensor = tokenizer(txt, context_length=77, truncate=True)
+            txt_tensor = tokenizer(txt, max_length=77, truncation=True, padding=True,return_tensors='pt')
             return txt_tensor
 
         return tokenizer_wrapper
 
-    def encode_text(self, text_tensor):
-        return self.clip_model.encode_text(text_tensor)
-
-    def encode_image(self, image_tensor):
-        return self.clip_model.encode_image(image_tensor)
 
     def fuse_embeddings(self, img_emb, txt_emb):
         fused_emb = img_emb + txt_emb
@@ -51,9 +58,23 @@ class CLIPInstructFusion(nn.Module):
         :param img_mask:  expected shape: [batch_size, 1]
         :return:
         """
-        txt_emb = self.encode_text(txt_tensor) * txt_mask.unsqueeze(-1)
-        img_emb = self.encode_image(img_tensor) * img_mask.unsqueeze(-1)
-        return self.fuse_embeddings(txt_emb, img_emb)  # shape: [batch_size, embed_dim]
+        output = self.clip_txt_model(**txt_tensor, output_hidden_states=True)
+        txt_hidden_states = output.last_hidden_state
+        
+        img = {}
+        img["pixel_values"] = img_tensor
+        output = self.clip_img_model(**img, output_hidden_states=True)
+        img_embed = output.image_embeds 
+
+        
+        cls_tokens = self.cls_token.expand(txt_hidden_states.shape[0], -1, -1)
+        embed_tokens = self.embed_token.expand(txt_hidden_states.shape[0], -1, -1)
+
+        fusion_transformer_inputs = torch.cat((cls_tokens, img_embed.unsqueeze(1), txt_hidden_states, embed_tokens), dim=1)
+        fusion_output = self.fusion_encoder(fusion_transformer_inputs)
+
+
+        return fusion_output[:,0,:].squeeze(1)  # shape: [batch_size, embed_dim]
 
     def encode_multimodal_input_with_prompt(self, txt_tensor, img_tensor, txt_mask, img_mask, prompt_tensor, prompt_mask):
         """
@@ -63,13 +84,28 @@ class CLIPInstructFusion(nn.Module):
         :param img_mask:  expected shape: [batch_size, 1]
         :return:
         """
-        txt_emb = self.encode_text(txt_tensor) * txt_mask.unsqueeze(-1)
-        prompt_emb = self.encode_text(prompt_tensor) * prompt_mask.unsqueeze(-1)
-        img_emb = self.encode_image(img_tensor) * img_mask.unsqueeze(-1)
-        return self.fuse_embeddings(txt_emb, img_emb)  # shape: [batch_size, embed_dim]
+        
+        output = self.clip_txt_model(**txt_tensor, output_hidden_states=True)
+        txt_hidden_states = output.last_hidden_state
+        output = self.clip_txt_model(**prompt_tensor, output_hidden_states=True)
+        prompt_hidden_states = output.last_hidden_state
+        
+        img = {}
+        img["pixel_values"] = img_tensor
+        output = self.clip_img_model(**img, output_hidden_states=True)
+        img_embed = output.image_embeds 
+        
+        cls_tokens = self.cls_token.expand(txt_hidden_states.shape[0], -1, -1)
+        
+        
+        fusion_transformer_inputs = torch.cat((cls_tokens, img_embed.unsqueeze(1), txt_hidden_states, prompt_hidden_states), dim=1)
+        fusion_output = self.fusion_encoder(fusion_transformer_inputs)
+
+
+        return fusion_output[:,0,:].squeeze(1)  # shape: [batch_size, embed_dim]
 
     def get_logit_scale(self):
-        return self.clip_model.logit_scale.exp()
+        return self.clip_img_model.logit_scale.exp()
 
     def compute_inbatch_contrastive_loss(self, batch):
         """
@@ -100,25 +136,30 @@ class CLIPInstructFusion(nn.Module):
             if enable_hard_neg:
                 n_embeds = embeddings[torch.tensor(index_mapping["neg_cand_list"])]  # [bs, neg_num, embed_dim]
         else:
-            query_txt_batched = txt_batched[torch.tensor(index_mapping["query"]).flatten()]
+            
+            #for key in txt_batched:
+            query_txt_batched = {}
+            for key in txt_batched:
+                index_mapping["query"] = index_mapping["query"].int()
+                query_txt_batched[key] = txt_batched[key][index_mapping["query"].flatten()]
             query_img_batched = image_batched[torch.tensor(index_mapping["query"]).flatten()]
+            # query_prompt_batched = prompt_batched[torch.tensor(index_mapping["query"]).flatten()]
+            # query_prompt_mask_batched = prompt_mask_batched[torch.tensor(index_mapping["query"]).flatten()]
             query_txt_mask_batched = txt_mask_batched[torch.tensor(index_mapping["query"]).flatten()]
             query_img_mask_batched = image_mask_batched[torch.tensor(index_mapping["query"]).flatten()]
-            q_embeds = self.encode_multimodal_input_with_prompt(query_txt_batched, query_img_batched, query_txt_mask_batched, query_img_mask_batched, prompt_batched, prompt_mask_batched)
+            
 
-
-            pos_txt_batched = txt_batched[torch.tensor(index_mapping["pos_cand"]).flatten()]
+            pos_txt_batched = {}
+            index_mapping["pos_cand"] = index_mapping["pos_cand"].int()
+            for key in txt_batched:
+                pos_txt_batched[key] = txt_batched[key][torch.tensor(index_mapping["pos_cand"]).flatten()]
             pos_img_batched = image_batched[torch.tensor(index_mapping["pos_cand"]).flatten()]
             pos_txt_mask_batched = txt_mask_batched[torch.tensor(index_mapping["pos_cand"]).flatten()]
             pos_img_mask_batched = image_mask_batched[torch.tensor(index_mapping["pos_cand"]).flatten()]
-            p_embeds = self.encode_multimodal_input(pos_txt_batched, pos_txt_mask_batched, pos_img_batched, pos_img_mask_batched)
+            q_embeds = self.encode_multimodal_input_with_prompt(query_txt_batched, query_img_batched, query_txt_mask_batched, query_img_mask_batched, prompt_batched, prompt_mask_batched)
+            p_embeds = self.encode_multimodal_input(pos_txt_batched,pos_img_batched, pos_txt_mask_batched, pos_img_mask_batched)
 
-            if enable_hard_neg:
-                neg_txt_batched = txt_batched[torch.tensor(index_mapping["neg_cand_list"]).flatten()]
-                neg_img_batched = image_batched[torch.tensor(index_mapping["neg_cand_list"]).flatten()]
-                neg_txt_mask_batched = txt_mask_batched[torch.tensor(index_mapping["neg_cand_list"]).flatten()]
-                neg_img_mask_batched = image_mask_batched[torch.tensor(index_mapping["neg_cand_list"]).flatten()]
-                n_embeds = self.encode_multimodal_input(neg_txt_batched, neg_txt_mask_batched, neg_img_batched, neg_img_mask_batched)
+            
         
         bs = q_embeds.size(0)
 
@@ -126,7 +167,7 @@ class CLIPInstructFusion(nn.Module):
         q_embeds = F.normalize(q_embeds, dim=-1)
         p_embeds = F.normalize(p_embeds, dim=-1)
 
-        logit_scale = self.get_logit_scale()
+        logit_scale = math.exp(2.6592)
 
         # We gather tensors from all gpus
         if self.gather_embeddings:
@@ -204,26 +245,31 @@ class CLIPInstructFusion(nn.Module):
             prompt_mask_batched = batch["prompt_mask_batched"]
             txt_mask_batched = batch["txt_mask_batched"]
             image_mask_batched = batch["image_mask_batched"]
-            query_txt_batched = txt_batched[torch.tensor(index_mapping["query"]).flatten()]
+            query_txt_batched = {}
+            for key in txt_batched:
+                query_txt_batched[key] = txt_batched[key][torch.tensor(index_mapping["query"]).flatten()]
             query_img_batched = image_batched[torch.tensor(index_mapping["query"]).flatten()]
             query_txt_mask_batched = txt_mask_batched[torch.tensor(index_mapping["query"]).flatten()]
             query_img_mask_batched = image_mask_batched[torch.tensor(index_mapping["query"]).flatten()]
-            q_embeds = self.encode_multimodal_input_with_prompt(query_txt_batched, query_img_batched, query_txt_mask_batched, query_img_mask_batched, prompt_batched, prompt_mask_batched)
-            embeddings = torch.zeros(len(id_list),q_embeds.size(-1) ,device=q_embeds.device)
+            
 
-            pos_txt_batched = txt_batched[torch.tensor(index_mapping["pos_cand"]).flatten()]
+            pos_txt_batched = {}
+            for key in txt_batched:
+                pos_txt_batched[key] = txt_batched[key][torch.tensor(index_mapping["pos_cand"]).flatten()]
             pos_img_batched = image_batched[torch.tensor(index_mapping["pos_cand"]).flatten()]
             pos_txt_mask_batched = txt_mask_batched[torch.tensor(index_mapping["pos_cand"]).flatten()]
             pos_img_mask_batched = image_mask_batched[torch.tensor(index_mapping["pos_cand"]).flatten()]
+            q_embeds = self.encode_multimodal_input_with_prompt(query_txt_batched, query_img_batched, query_txt_mask_batched, query_img_mask_batched, prompt_batched, prompt_mask_batched)
             p_embeds = self.encode_multimodal_input(pos_txt_batched, pos_txt_mask_batched, pos_img_batched, pos_img_mask_batched)
 
-            if enable_hard_neg:
-                ## There is no hard neg anyways in evaluate
-                neg_txt_batched = txt_batched[torch.tensor(index_mapping["neg_cand_list"]).flatten()]
-                neg_img_batched = image_batched[torch.tensor(index_mapping["neg_cand_list"]).flatten()]
-                neg_txt_mask_batched = txt_mask_batched[torch.tensor(index_mapping["neg_cand_list"]).flatten()]
-                neg_img_mask_batched = image_mask_batched[torch.tensor(index_mapping["neg_cand_list"]).flatten()]
-                n_embeds = self.encode_multimodal_input(neg_txt_batched, neg_txt_mask_batched, neg_img_batched, neg_img_mask_batched)
+            # if enable_hard_neg:
+            #     ## There is no hard neg anyways in evaluate
+            #     neg_txt_batched = txt_batched[torch.tensor(index_mapping["neg_cand_list"]).flatten()]
+            #     neg_img_batched = image_batched[torch.tensor(index_mapping["neg_cand_list"]).flatten()]
+            #     neg_txt_mask_batched = txt_mask_batched[torch.tensor(index_mapping["neg_cand_list"]).flatten()]
+            #     neg_img_mask_batched = image_mask_batched[torch.tensor(index_mapping["neg_cand_list"]).flatten()]
+            #     n_embeds = self.encode_multimodal_input(neg_txt_batched, neg_txt_mask_batched, neg_img_batched, neg_img_mask_batched)
+            embeddings = torch.zeros(len(id_list),q_embeds.size(-1) ,device=q_embeds.device)
             embeddings[torch.tensor(index_mapping["query"]), :] = q_embeds
             embeddings[torch.tensor(index_mapping["pos_cand"]),:] = p_embeds
             embeddings[torch.tensor(index_mapping["neg_Cand_list"]),:] = n_embeds

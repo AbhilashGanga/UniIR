@@ -27,6 +27,7 @@ data_config:
 
     # Relative to mbeir_data_dir
     enable_query_instruct: True
+    enable_instruct_fusion: True
     query_instruct_path: "instructions/query_instructions.tsv"
 
     train_query_data_path: "query/union_train/mbeir_union_up_train.jsonl"
@@ -38,7 +39,7 @@ data_config:
 # DataLoader settings
 dataloader_config:
     num_workers: 5
-    train_batch_size: 105  # 78597MiB / 81559MiB
+    train_batch_size: 10  # 78597MiB / 81559MiB
     valid_batch_size: 2048
 
 # Trainer settings
@@ -58,8 +59,8 @@ evaluator:
 
 # Model settings
 model:
-    name: "CLIPScoreFusion"
-    short_name: "CLIP_SF"
+    name: "CLIPInstructFusion"
+    short_name: "CLIP_IF"
     size: "Large"
 
     clip_vision_model_name: "ViT-L/14"

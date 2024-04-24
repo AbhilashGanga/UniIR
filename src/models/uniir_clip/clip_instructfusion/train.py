@@ -182,13 +182,13 @@ def main(config):
     model_config = config.model
     pretrained_clip_model_dir = os.path.join(config.uniir_dir, model_config.pretrained_clip_model_dir)
     logger.info(f"Downloading CLIP model to {pretrained_clip_model_dir}...")
-    model = CLIPScoreFusion(
+    model = CLIPInstructFusion(
         model_name=model_config.clip_vision_model_name,
         download_root=pretrained_clip_model_dir,
         config=config,
     )
     model.float()  # The origial CLIP was in fp16 so we need to convert it to fp32
-
+    print(model)
     # Set up optimizer, and scaler
     # Apply different optimization strategies to different parameters
     # This is adapted from the UniVL-DR codebase
