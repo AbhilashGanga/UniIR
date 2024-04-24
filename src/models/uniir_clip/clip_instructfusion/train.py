@@ -178,7 +178,7 @@ def main(config):
     cudnn.benchmark = True
 
     # Initialize and load model
-    print("Creating CLIP-SF model...")
+    print("Creating CLIP-IF model...")
     model_config = config.model
     pretrained_clip_model_dir = os.path.join(config.uniir_dir, model_config.pretrained_clip_model_dir)
     logger.info(f"Downloading CLIP model to {pretrained_clip_model_dir}...")
@@ -188,23 +188,37 @@ def main(config):
         config=config,
     )
     model.float()  # The origial CLIP was in fp16 so we need to convert it to fp32
-    print(model)
     # Set up optimizer, and scaler
     # Apply different optimization strategies to different parameters
     # This is adapted from the UniVL-DR codebase
-    exclude_condition = lambda n, p: p.ndim < 2 or any(sub in n for sub in ["bn", "ln", "bias", "logit_scale"])
-    include_condition = lambda n, p: not exclude_condition(n, p)
-    gain_or_bias_params = filter_parameters(model, exclude_condition)
-    rest_params = filter_parameters(model, include_condition)
-    optimizer = create_optimizer(gain_or_bias_params, rest_params, config)
+    # exclude_condition = lambda n, p: p.ndim < 2 or any(sub in n for sub in ["bn", "ln", "bias", "logit_scale"])
+    # include_condition = lambda n, p: not exclude_condition(n, p)
+    # gain_or_bias_params = filter_parameters(model, exclude_condition)
+    # rest_params = filter_parameters(model, include_condition)
+    training_params = []
+    for n,p in model.named_parameters():
+        if 'clip_txt_model' in n or 'clip_img_model' in n:
+            p.requires_grad = False
+        else:
+            training_params.append(p)
+    
+        
+    optimizer = optim.AdamW(
+        [
+            {"params": training_params, "weight_decay": 0.2},
+        ],
+        lr=config.trainer_config.learning_rate,
+        betas=(0.9, 0.98),
+        eps=1.0e-6,
+    )
     scaler = GradScaler()  # Initialize the GradScaler
-
+    
     # If resume training, load the checkpoint
     ckpt_config = model_config.ckpt_config
     if ckpt_config.resume_training:
         checkpoint_path = os.path.join(config.uniir_dir, ckpt_config.ckpt_dir, ckpt_config.ckpt_name)
         assert os.path.exists(checkpoint_path), f"Checkpoint file {checkpoint_path} does not exist."
-        logger.info(f"loading CLIPScoreFusion checkpoint from {checkpoint_path}")
+        logger.info(f"loading CLIPInstructFusion checkpoint from {checkpoint_path}")
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint["model"])
         optimizer.load_state_dict(checkpoint["optimizer"])
