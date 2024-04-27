@@ -122,21 +122,21 @@ def train(
         if is_distributed_mode:
             train_loader.sampler.set_epoch(epoch)
 
-        # train_stats = train_one_epoch(
-        #     model,
-        #     train_loader,
-        #     optimizer,
-        #     epoch,
-        #     gpu_id,
-        #     scheduler,
-        #     global_step,
-        #     scaler,
-        #     config,
-        # )
+        train_stats = train_one_epoch(
+            model,
+            train_loader,
+            optimizer,
+            epoch,
+            gpu_id,
+            scheduler,
+            global_step,
+            scaler,
+            config,
+        )
 
         eval_freq = config.evaluator.eval_freq
         if val_loader is None or epoch % eval_freq != 0:
-            # log_stats = log_results(train_stats, None, None, epoch, best_epoch)
+            log_stats = log_results(train_stats, None, None, epoch, best_epoch)
             if utils.is_main_process():
                 save_checkpoint(model_without_ddp, optimizer, scheduler, epoch, scaler, config)
         else:
@@ -198,14 +198,14 @@ def main(config):
     training_params = []
     for n,p in model.named_parameters():
         if 'clip_txt_model' in n or 'clip_img_model' in n:
-            p.requires_grad = False
+            training_params.append(p)
         else:
             training_params.append(p)
     
         
     optimizer = optim.AdamW(
         [
-            {"params": training_params, "weight_decay": 0.2},
+            {"params": training_params, "weight_decay": 0.1},
         ],
         lr=config.trainer_config.learning_rate,
         betas=(0.9, 0.98),
@@ -221,8 +221,8 @@ def main(config):
         logger.info(f"loading CLIPInstructFusion checkpoint from {checkpoint_path}")
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint["model"])
-        optimizer.load_state_dict(checkpoint["optimizer"])
-        scaler.load_state_dict(checkpoint["scaler"])
+        # optimizer.load_state_dict(checkpoint["optimizer"])
+        # scaler.load_state_dict(checkpoint["scaler"])
 
     # Move model to GPUs
     model.train()
