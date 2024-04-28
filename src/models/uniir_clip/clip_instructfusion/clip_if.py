@@ -252,15 +252,16 @@ class CLIPInstructFusion(nn.Module):
             query_txt_mask_batched = txt_mask_batched[torch.tensor(index_mapping["query"]).flatten()]
             query_img_mask_batched = image_mask_batched[torch.tensor(index_mapping["query"]).flatten()]
             
+            if "pos_cand" in index_mapping:
+                pos_txt_batched = {}
+                for key in txt_batched:
+                    pos_txt_batched[key] = txt_batched[key][torch.tensor(index_mapping["pos_cand"]).flatten()]
+                pos_img_batched = image_batched[torch.tensor(index_mapping["pos_cand"]).flatten()]
+                pos_txt_mask_batched = txt_mask_batched[torch.tensor(index_mapping["pos_cand"]).flatten()]
+                pos_img_mask_batched = image_mask_batched[torch.tensor(index_mapping["pos_cand"]).flatten()]
+                p_embeds = self.encode_multimodal_input(pos_txt_batched, pos_txt_mask_batched, pos_img_batched, pos_img_mask_batched)
 
-            pos_txt_batched = {}
-            for key in txt_batched:
-                pos_txt_batched[key] = txt_batched[key][torch.tensor(index_mapping["pos_cand"]).flatten()]
-            pos_img_batched = image_batched[torch.tensor(index_mapping["pos_cand"]).flatten()]
-            pos_txt_mask_batched = txt_mask_batched[torch.tensor(index_mapping["pos_cand"]).flatten()]
-            pos_img_mask_batched = image_mask_batched[torch.tensor(index_mapping["pos_cand"]).flatten()]
             q_embeds = self.encode_multimodal_input_with_prompt(query_txt_batched, query_img_batched, query_txt_mask_batched, query_img_mask_batched, prompt_batched, prompt_mask_batched)
-            p_embeds = self.encode_multimodal_input(pos_txt_batched, pos_txt_mask_batched, pos_img_batched, pos_img_mask_batched)
 
             # if enable_hard_neg:
             #     ## There is no hard neg anyways in evaluate
@@ -270,9 +271,9 @@ class CLIPInstructFusion(nn.Module):
             #     neg_img_mask_batched = image_mask_batched[torch.tensor(index_mapping["neg_cand_list"]).flatten()]
             #     n_embeds = self.encode_multimodal_input(neg_txt_batched, neg_txt_mask_batched, neg_img_batched, neg_img_mask_batched)
             embeddings = torch.zeros(len(id_list),q_embeds.size(-1) ,device=q_embeds.device)
-            embeddings[torch.tensor(index_mapping["query"]), :] = q_embeds
-            embeddings[torch.tensor(index_mapping["pos_cand"]),:] = p_embeds
-            embeddings[torch.tensor(index_mapping["neg_Cand_list"]),:] = n_embeds
+            embeddings[torch.tensor(index_mapping["query"]).flatten(),:] = q_embeds
+            if "pos_cand" in index_mapping:
+                embeddings[torch.tensor(index_mapping["pos_cand"]),:] = p_embeds
             assert embeddings.size(0) == len(id_list), "embeddings and id_batched must have the same batch size."
             return embeddings, id_list
 
