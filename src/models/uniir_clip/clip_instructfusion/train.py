@@ -221,8 +221,7 @@ def main(config):
         logger.info(f"loading CLIPInstructFusion checkpoint from {checkpoint_path}")
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint["model"])
-        # optimizer.load_state_dict(checkpoint["optimizer"])
-        # scaler.load_state_dict(checkpoint["scaler"])
+
 
     # Move model to GPUs
     model.train()
