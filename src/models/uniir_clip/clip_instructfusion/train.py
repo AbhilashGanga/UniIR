@@ -198,14 +198,14 @@ def main(config):
     training_params = []
     for n,p in model.named_parameters():
         if 'clip_txt_model' in n or 'clip_img_model' in n:
-            p.requires_grad = False
+            training_params.append(p)
         else:
             training_params.append(p)
     
         
     optimizer = optim.AdamW(
         [
-            {"params": training_params, "weight_decay": 0.2},
+            {"params": training_params, "weight_decay": 0.1},
         ],
         lr=config.trainer_config.learning_rate,
         betas=(0.9, 0.98),
@@ -221,8 +221,7 @@ def main(config):
         logger.info(f"loading CLIPInstructFusion checkpoint from {checkpoint_path}")
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint["model"])
-        #optimizer.load_state_dict(checkpoint["optimizer"])
-        #scaler.load_state_dict(checkpoint["scaler"])
+
 
     # Move model to GPUs
     model.train()

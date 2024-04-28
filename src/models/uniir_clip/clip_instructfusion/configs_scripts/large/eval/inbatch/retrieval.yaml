@@ -4,8 +4,8 @@ experiment:
   instruct_status: Instruct
   path_suffix: ${model.short_name}/${model.size}/${experiment.instruct_status}/${experiment.exp_name}/
 model:
-  name: CLIPScoreFusion
-  short_name: CLIP_SF
+  name: CLIPInstructFusion
+  short_name: CLIP_IF
   size: Large
 retrieval_config:
   embed_dir_name: embed

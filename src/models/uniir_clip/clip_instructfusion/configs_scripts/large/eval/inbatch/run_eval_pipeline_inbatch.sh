@@ -16,7 +16,7 @@ UNIIR_DIR="/burg/dsi/users/nd2794/mmir" # <--- Change this to the UniIR director
 MBEIR_DATA_DIR="/burg/dsi/users/nd2794/mmir/M-BEIR" # <--- Change this to the MBEIR data directory you download from HF page (data)
 
 # Path to config dir
-MODEL="uniir_clip/clip_scorefusion"  # <--- Change this to the model you want to run
+MODEL="uniir_clip/clip_instructfusion"  # <--- Change this to the model you want to run
 MODEL_DIR="$SRC/models/$MODEL"
 SIZE="large"
 MODE="eval"  # <--- Change this to the mode you want to run
@@ -39,20 +39,20 @@ conda activate /burg/dsi/users/nd2794/mmir/envs/uniir # <--- Change this to the 
 
 # Run Embedding command
 
-#CONFIG_PATH="$CONFIG_DIR/embed.yaml"
-#SCRIPT_NAME="mbeir_embedder.py"
-#echo "CONFIG_PATH: $CONFIG_PATH"
-#echo "SCRIPT_NAME: $SCRIPT_NAME"
+CONFIG_PATH="$CONFIG_DIR/embed.yaml"
+SCRIPT_NAME="mbeir_embedder.py"
+echo "CONFIG_PATH: $CONFIG_PATH"
+echo "SCRIPT_NAME: $SCRIPT_NAME"
 
-#python config_updater.py \
-#    --update_mbeir_yaml_instruct_status \
-#    --mbeir_yaml_file_path $CONFIG_PATH \
-#    --enable_instruct True
+python config_updater.py \
+    --update_mbeir_yaml_instruct_status \
+    --mbeir_yaml_file_path $CONFIG_PATH \
+    --enable_instruct True
 
-#python -m torch.distributed.run --nproc_per_node=$NPROC $SCRIPT_NAME \
-#    --config_path "$CONFIG_PATH" \
-#    --uniir_dir "$UNIIR_DIR" \
-#    --mbeir_data_dir "$MBEIR_DATA_DIR"
+python -m torch.distributed.run --nproc_per_node=$NPROC $SCRIPT_NAME \
+    --config_path "$CONFIG_PATH" \
+    --uniir_dir "$UNIIR_DIR" \
+    --mbeir_data_dir "$MBEIR_DATA_DIR"
 
 # Activate faiss environment
 conda activate /burg/dsi/users/nd2794/mmir/envs/faiss # <--- Change this to the name of your conda environment

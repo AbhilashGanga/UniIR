@@ -8,7 +8,7 @@ data_config:
   train_dir_name: query/train
   val_dir_name: query/val
 dataloader_config:
-  batch_size: 1024
+  batch_size: 200
   num_workers: 4
 dist_config:
   dist_url: env://
@@ -87,10 +87,10 @@ experiment:
 model:
   ckpt_config:
     ckpt_dir: checkpoint/${experiment.path_suffix}
-    ckpt_name: clip_sf_large.pth
+    ckpt_name: clip_if_epoch_5.pth
   clip_vision_model_name: ViT-L/14
-  name: CLIPScoreFusion
+  name: CLIPInstructFusion
   pretrained_clip_model_dir: checkpoint/CLIP/
-  short_name: CLIP_SF
+  short_name: CLIP_IF
   size: Large
 seed: 2023

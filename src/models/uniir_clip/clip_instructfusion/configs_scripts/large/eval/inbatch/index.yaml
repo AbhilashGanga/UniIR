@@ -31,6 +31,6 @@ index_config:
     metric: METRIC_INNER_PRODUCT
   index_dir_name: index
 model:
-  name: CLIPScoreFusion
-  short_name: CLIP_SF
+  name: CLIPInstructFusion
+  short_name: CLIP_IF
   size: Large

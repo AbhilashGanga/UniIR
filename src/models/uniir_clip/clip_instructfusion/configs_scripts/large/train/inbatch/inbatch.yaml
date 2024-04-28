@@ -13,8 +13,8 @@ data_config:
   val_query_data_path: query/union_val/mbeir_union_val.jsonl
 dataloader_config:
   num_workers: 5
-  train_batch_size: 350
-  valid_batch_size: 350
+  train_batch_size: 20
+  valid_batch_size: 20
 dist_config:
   dist_url: env://
 evaluator:
@@ -32,7 +32,7 @@ logger_config:
 model:
   ckpt_config:
     ckpt_dir: checkpoint/${experiment.path_suffix}
-    ckpt_name: clip_if_epoch_2.pth
+    ckpt_name: clip_if_epoch_5.pth
     resume_training: true
   clip_vision_model_name: ViT-L/14
   gather_embeddings: true
@@ -44,10 +44,10 @@ seed: 2023
 trainer_config:
   eval_steps: 500
   gradient_accumulation_steps: 1
-  learning_rate: 1e-4
+  learning_rate: 1e-5
   num_train_epochs: 20
   print_freq: 50
-  warmup_steps: 1000
+  warmup_steps: 0
 wandb_config:
   enabled: true
   experiment_name: ${experiment.description}
