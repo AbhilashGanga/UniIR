@@ -122,21 +122,21 @@ def train(
         if is_distributed_mode:
             train_loader.sampler.set_epoch(epoch)
 
-        # train_stats = train_one_epoch(
-        #     model,
-        #     train_loader,
-        #     optimizer,
-        #     epoch,
-        #     gpu_id,
-        #     scheduler,
-        #     global_step,
-        #     scaler,
-        #     config,
-        # )
+        train_stats = train_one_epoch(
+            model,
+            train_loader,
+            optimizer,
+            epoch,
+            gpu_id,
+            scheduler,
+            global_step,
+            scaler,
+            config,
+        )
 
         eval_freq = config.evaluator.eval_freq
         if val_loader is None or epoch % eval_freq != 0:
-            # log_stats = log_results(train_stats, None, None, epoch, best_epoch)
+            log_stats = log_results(train_stats, None, None, epoch, best_epoch)
             if utils.is_main_process():
                 save_checkpoint(model_without_ddp, optimizer, scheduler, epoch, scaler, config)
         else:
@@ -221,8 +221,8 @@ def main(config):
         logger.info(f"loading CLIPInstructFusion checkpoint from {checkpoint_path}")
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint["model"])
-        optimizer.load_state_dict(checkpoint["optimizer"])
-        scaler.load_state_dict(checkpoint["scaler"])
+        #optimizer.load_state_dict(checkpoint["optimizer"])
+        #scaler.load_state_dict(checkpoint["scaler"])
 
     # Move model to GPUs
     model.train()
