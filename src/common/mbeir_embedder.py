@@ -20,7 +20,7 @@ import transformers
 import dist_utils
 from dist_utils import ContiguousDistributedSampler
 from utils import build_model_from_config
-from data.mbeir_dataset import (
+from data.mbeir_dataset_align import (
     MBEIRMainDataset,
     MBEIRMainCollator,
     MBEIRCandidatePoolDataset,
@@ -49,9 +49,18 @@ def generate_embeds_and_ids_for_dataset_with_gather(model, data_loader, device, 
             elif isinstance(value, transformers.tokenization_utils_base.BatchEncoding):
                 for k, v in value.items():
                     batch[key][k] = v.to(device)
+            elif isinstance(batch[key], list) and not isinstance(batch[key][0], int):
+                model_without_ddp = model.module
+                image_processor = model_without_ddp.get_img_preprocess_fn()
+                #print(batch[key])
+                #print(type(batch[key]))
+                batch[key] = image_processor(images = batch[key], return_tensors="pt")
+                for k in batch[key]:
+                    batch[key][k] = batch[key][k].to(device, non_blocking=True)
+
         # Enable autocast to FP16
-        with autocast(enabled=use_fp16):
-            embeddings_batched, ids_list_batched = model(batch, encode_mbeir_batch=True)
+        #with autocast(enabled=use_fp16):
+        embeddings_batched, ids_list_batched = model(batch, encode_mbeir_batch=True)
 
         embedding_tensors.append(embeddings_batched.half())  # We only save FP16 embeddings to save space.
         id_list.extend(ids_list_batched)

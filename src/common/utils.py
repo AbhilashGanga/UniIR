@@ -84,6 +84,24 @@ def build_model_from_config(config):
         print(f"loading CLIPScoreFusion checkpoint from {checkpoint_path}")
         model.load_state_dict(torch.load(checkpoint_path)["model"])
 
+    elif model_name == "ALIGNScoreFusion":
+        from models.uniir_align.align_scorefusion.align_sf import ALIGNScoreFusion
+
+        model_config = config.model
+        uniir_dir = config.uniir_dir
+        download_root = os.path.join(uniir_dir, model_config.pretrained_align_model_dir)
+        model = ALIGNScoreFusion(
+            model_name=model_config.align_vision_model_name,
+            download_root=download_root,
+        )
+        model.float()
+
+        ckpt_config = model_config.ckpt_config
+        checkpoint_path = os.path.join(config.uniir_dir, ckpt_config.ckpt_dir, ckpt_config.ckpt_name)
+        assert os.path.exists(checkpoint_path), f"Checkpoint file {checkpoint_path} does not exist."
+        print(f"loading ALIGNScoreFusion checkpoint from {checkpoint_path}")
+        model.load_state_dict(torch.load(checkpoint_path)["model"])
+
     elif model_name == "CLIPFeatureFusion":
         from models.uniir_clip.clip_featurefusion.clip_ff import CLIPFeatureFusion
 
