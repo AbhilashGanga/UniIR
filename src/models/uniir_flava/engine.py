@@ -1,7 +1,7 @@
 import torch
 from torch.cuda.amp import autocast
 
-from models.uniir_clip import utils
+from models.uniir_flava import utils
 
 
 def train_one_epoch(model, data_loader, optimizer, epoch, gpu_id, scheduler, global_step, scaler, config):
@@ -20,17 +20,13 @@ def train_one_epoch(model, data_loader, optimizer, epoch, gpu_id, scheduler, glo
         for key in batch:
             if isinstance(batch[key], torch.Tensor):
                 batch[key] = batch[key].to(gpu_id, non_blocking=True)  # Batch is a dictionary of tensors
-            
-            if key=="index_mapping" or key=='txt_batched' or key=="prompt_batched":
-                for k in batch[key]:
-                    if isinstance(batch[key][k], list):
-                        batch[key][k] = torch.Tensor(batch[key][k])    
-                    batch[key][k] = batch[key][k].to(gpu_id, non_blocking=True)
-
-                    
-                
-
+            for k in batch[key]:
+                # print(k)
+                if key=='txt_batched' or key=='image_batched' or key=='txt_mask_batched' or key=='image_mask_batched':
+                    if type(k)==str:
+                        batch[key][k] = batch[key][k].to(gpu_id, non_blocking=True)
         # autocast for mixed precision
+        # print(batch)
         with autocast():
             outputs = model(batch)
             loss = outputs["loss"]
@@ -77,12 +73,11 @@ def eval_engine(model, data_loader, gpu_id, config):
         for key in batch:
             if isinstance(batch[key], torch.Tensor):
                 batch[key] = batch[key].to(gpu_id, non_blocking=True)  # Batch is a dictionary of tensors
-            if key=="index_mapping" or key=='txt_batched' or key=="prompt_batched":
-                for k in batch[key]:
-                    if isinstance(batch[key][k], list):
-                        batch[key][k] = torch.Tensor(batch[key][k])    
-                    batch[key][k] = batch[key][k].to(gpu_id, non_blocking=True)
-
+            for k in batch[key]:
+                # print(k)
+                if key=='txt_batched' or key=='image_batched' or key=='txt_mask_batched' or key=='image_mask_batched':
+                    if type(k)==str:
+                        batch[key][k] = batch[key][k].to(gpu_id, non_blocking=True)
         # autocast for mixed precision
         with autocast():
             outputs = model(batch)

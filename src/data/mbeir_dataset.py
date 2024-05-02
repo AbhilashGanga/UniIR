@@ -7,6 +7,8 @@ import random
 from enum import Enum
 from typing import Callable, List, Union, Any
 
+from transformers import BertTokenizerFast
+from transformers import AutoProcessor, AutoImageProcessor, AutoTokenizer
 # Third-party
 import numpy as np
 import torch
@@ -117,6 +119,7 @@ class MBEIRMainDataset(MBEIRDatasetBase):
         img_preprocess_fn,
         mode=Mode.TRAIN,
         enable_query_instruct=True,  # Whether to enable instructions
+        enable_instruct_fusion=False,
         shuffle_cand=True,  # Whether to shuffle the candidates
         hard_neg_num=0,  # Number of negative examples in the batch
         returns=None,  # Catch any return-related settings
@@ -133,6 +136,7 @@ class MBEIRMainDataset(MBEIRDatasetBase):
         self.select_cand = self._get_random_cand if self.shuffle_cand else self._get_first_cand
         self.enable_query_instruct = enable_query_instruct
         self.hard_neg_num = hard_neg_num
+        self.enable_instruct_fusion = enable_instruct_fusion
 
         returns = {} if returns is None else returns
         self.returns = {
@@ -156,6 +160,8 @@ class MBEIRMainDataset(MBEIRDatasetBase):
         print(f"Enable Query Instructions: {self.enable_query_instruct}")
         if self.enable_query_instruct:
             print(f"Query Instructions Path: {self.query_instruct_path}")
+        if self.enable_instruct_fusion:
+            print(f"Enable Instruct Fusion: {self.enable_instruct_fusion}")
         print(f"Shuffle Candidates: {self.shuffle_cand}")
         print(f"Hard Negative Number: {self.hard_neg_num}")
         print(f"Returns: {self.returns}")
@@ -238,12 +244,16 @@ class MBEIRMainDataset(MBEIRDatasetBase):
 
         def _prepare_data_dict(txt, img_path):
             img = self._load_and_preprocess_image(img_path)
-            return {"txt": txt, "img": img}
+            if self.enable_instruct_fusion:
+                return {"txt": txt, "img": img, "txt_without_prompt": query_txt_without_prompt, "prompt": query_prompt}
+            else:
+                return {"txt": txt, "img": img}
 
         query = _prepare_data_dict(
             query_txt_with_prompt if self.enable_query_instruct else query_txt_without_prompt, query_img_path
         )
         instance = {"query": query}
+        
 
         if self.mode == Mode.EVAL:
             if self.returns.get("hashed_qid"):
@@ -367,6 +377,8 @@ class MBEIRMainCollator(MBEIRCollatorBase):
         # Allowing for efficient GPU-based processing.
 
         txt_list, txt_mask_list, img_list, img_mask_list = [], [], [], []
+        prompt_list = []
+        prompt_mask_list = []
 
         index_mapping = {
             "query": [[] for _ in range(len(batch))],
@@ -400,6 +412,7 @@ class MBEIRMainCollator(MBEIRCollatorBase):
                 instance_keys.extend(["neg_cand_list"])
 
         # Generate Index Mapping
+        
         counter = 0
         for inst_idx, instance in enumerate(batch):
             for instance_key in instance_keys:
@@ -407,23 +420,47 @@ class MBEIRMainCollator(MBEIRCollatorBase):
                 for item in items:
                     txt = item["txt"]
                     img = item["img"]
+                    
+
 
                     index_mapping[instance_key][inst_idx].append(counter)  # Track current index
                     counter += 1
+                    if "prompt" in item and instance_key == "query":
+                        txt = item["txt_without_prompt"]
+                        prompt = item["prompt"]
+                        padded_prompt, prompt_mask = self._get_padded_text_with_mask(prompt)
+                        prompt_list.append(padded_prompt)
+                        prompt_mask_list.append(prompt_mask)
+
+                        
                     padded_txt, txt_mask = self._get_padded_text_with_mask(txt)
                     padded_img, img_mask = self._get_padded_image_with_mask(img)
+                    if hasattr(padded_img, 'pixel_values'):
+                        padded_img = torch.tensor(np.array(padded_img['pixel_values'])).squeeze(0)
                     txt_list.append(padded_txt)
                     img_list.append(padded_img)
                     txt_mask_list.append(txt_mask)
                     img_mask_list.append(img_mask)
+        # print(self.tokenizer)
+        if isinstance(self.tokenizer, BertTokenizerFast):
+            processed_batch = {
+                "txt_batched": self.tokenizer(txt_list, max_length=77, truncation=True, padding=True,return_tensors='pt'),
+                "image_batched": torch.stack(img_list, dim=0),
+                "txt_mask_batched": torch.tensor(txt_mask_list, dtype=torch.long),
+                "image_mask_batched": torch.tensor(img_mask_list, dtype=torch.long),
+                "index_mapping": index_mapping,
+            }
+        else:
+            processed_batch = {
+                "txt_batched": self.tokenizer(txt_list),
+                "image_batched": torch.stack(img_list, dim=0),
+                "prompt_batched": self.tokenizer(prompt_list),
+                "prompt_mask_batched": torch.tensor(prompt_mask_list, dtype=torch.long),
+                "txt_mask_batched": torch.tensor(txt_mask_list, dtype=torch.long),
+                "image_mask_batched": torch.tensor(img_mask_list, dtype=torch.long),
+                "index_mapping": index_mapping,
+            }
 
-        processed_batch = {
-            "txt_batched": self.tokenizer(txt_list),
-            "image_batched": torch.stack(img_list, dim=0),
-            "txt_mask_batched": torch.tensor(txt_mask_list, dtype=torch.long),
-            "image_mask_batched": torch.tensor(img_mask_list, dtype=torch.long),
-            "index_mapping": index_mapping,
-        }
 
         if self.mode == Mode.EVAL:
             if qid_list:
@@ -436,8 +473,10 @@ class MBEIRMainCollator(MBEIRCollatorBase):
                 processed_batch.update({"p_did_list": torch.tensor(p_did_list)})
 
         # TODO: Fix this hack for BLIP tokenizer.
-        if hasattr(processed_batch["txt_batched"], "input_ids"):
+        if hasattr(processed_batch["txt_batched"], "input_ids") and type(processed_batch["txt_batched"]["input_ids"]) !=list:
             bs = processed_batch["txt_batched"]["input_ids"].size(0)
+        elif hasattr(processed_batch["txt_batched"], "input_ids") and type(processed_batch["txt_batched"]["input_ids"]):
+            bs = len(processed_batch["txt_batched"]["input_ids"])
         else:
             bs = len(processed_batch["txt_batched"])
         assert bs == processed_batch["image_batched"].size(0)
@@ -459,6 +498,9 @@ class MBEIRCandidatePoolCollator(MBEIRCollatorBase):
             padded_txt, txt_mask = self._get_padded_text_with_mask(txt)
             padded_img, img_mask = self._get_padded_image_with_mask(img)
             txt_list.append(padded_txt)
+            if hasattr(padded_img, 'pixel_values'):
+                padded_img = torch.tensor(np.array(padded_img['pixel_values'])).squeeze(0)
+                
             img_list.append(padded_img)
             txt_mask_list.append(txt_mask)
             img_mask_list.append(img_mask)
@@ -466,19 +508,28 @@ class MBEIRCandidatePoolCollator(MBEIRCollatorBase):
             did = instance.get("did", None)
             if did is not None:
                 did_list.append(did)
-
-        processed_batch = {
-            "txt_batched": self.tokenizer(txt_list),
-            "image_batched": torch.stack(img_list, dim=0),
-            "txt_mask_batched": torch.tensor(txt_mask_list, dtype=torch.long),
-            "image_mask_batched": torch.tensor(img_mask_list, dtype=torch.long),
-        }
+        if isinstance(self.tokenizer, AutoTokenizer):
+            processed_batch = {
+                "txt_batched": self.tokenizer(txt_list, max_length=77, truncation=True, padding=True,return_tensors='pt'),
+                "image_batched": torch.stack(img_list, dim=0),
+                "txt_mask_batched": torch.tensor(txt_mask_list, dtype=torch.long),
+                "image_mask_batched": torch.tensor(img_mask_list, dtype=torch.long),
+            }
+        else:
+            processed_batch = {
+                "txt_batched": self.tokenizer(txt_list),
+                "image_batched": torch.stack(img_list, dim=0),
+                "txt_mask_batched": torch.tensor(txt_mask_list, dtype=torch.long),
+                "image_mask_batched": torch.tensor(img_mask_list, dtype=torch.long),
+            }
 
         if did_list:
             processed_batch.update({"did_list": did_list})
 
-        if hasattr(processed_batch["txt_batched"], "input_ids"):
+        if hasattr(processed_batch["txt_batched"], "input_ids") and type(processed_batch["txt_batched"]["input_ids"]) !=list:
             bs = processed_batch["txt_batched"]["input_ids"].size(0)
+        elif hasattr(processed_batch["txt_batched"], "input_ids") and type(processed_batch["txt_batched"]["input_ids"]):
+            bs = len(processed_batch["txt_batched"]["input_ids"])
         else:
             bs = len(processed_batch["txt_batched"])
         assert bs == processed_batch["image_batched"].size(0)

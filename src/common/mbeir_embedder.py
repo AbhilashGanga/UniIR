@@ -283,6 +283,7 @@ def generate_embeds_for_config(model, img_preprocess_fn, tokenizer, config):
                     img_preprocess_fn=img_preprocess_fn,
                     mode=mode,
                     enable_query_instruct=data_config.enable_query_instruct,
+                    enable_instruct_fusion=True,
                     shuffle_cand=data_config.shuffle_cand,
                     print_config=print_config,
                 )

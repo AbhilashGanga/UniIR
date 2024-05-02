@@ -54,6 +54,7 @@ def build_mbeir_dataset_from_config(config, img_preprocess_fn, tokenizer, datase
         img_preprocess_fn=img_preprocess_fn,
         mode=mode,
         enable_query_instruct=data_config.enable_query_instruct,
+        enable_instruct_fusion=data_config.enable_instruct_fusion,
         shuffle_cand=data_config.shuffle_cand,
         hard_neg_num=hard_neg_num,
         returns=data_config.returns,

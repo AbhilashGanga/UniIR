@@ -1,0 +1,23 @@
+experiment:
+  description: ${model.name} ${model.size} ${experiment.instruct_status} ${experiment.exp_name}
+  exp_name: InBatch
+  instruct_status: Instruct
+  path_suffix: ${model.short_name}/${model.size}/${experiment.instruct_status}/${experiment.exp_name}/
+index_config:
+  cand_pools_config:
+    cand_pools_name_to_idx:
+    - visualnews_task0
+    - mscoco_task0_test
+    - fashion200k_task0
+    - UNION
+    enable_idx: true
+  embed_dir_name: embed
+  faiss_config:
+    dim: 768
+    idx_type: Flat
+    metric: METRIC_INNER_PRODUCT
+  index_dir_name: index
+model:
+  name: FlavaScoreFusion
+  short_name: Flava_SF
+  size: Large
