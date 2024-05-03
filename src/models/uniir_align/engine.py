@@ -65,7 +65,7 @@ def train_one_epoch(model, model_without_ddp, data_loader, optimizer, epoch, gpu
 
 
 @torch.no_grad()
-def eval_engine(model, data_loader, gpu_id, config):
+def eval_engine(model, model_without_ddp, data_loader, gpu_id, config):
     model.eval()
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter("loss", utils.SmoothedValue(window_size=1, fmt="{value:.4f}"))

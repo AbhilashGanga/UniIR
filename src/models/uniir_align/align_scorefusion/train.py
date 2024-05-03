@@ -52,7 +52,7 @@ def filter_parameters(model, condition_fn):
 def create_optimizer(gain_or_bias_params, rest_params, config):
     return optim.AdamW(
         [
-            {"params": gain_or_bias_params, "weight_decay": 0.2},
+            {"params": gain_or_bias_params, "weight_decay": 0.0},
             {"params": rest_params, "weight_decay": 0.2},
         ],
         lr=config.trainer_config.learning_rate,
@@ -141,13 +141,13 @@ def train(
             if utils.is_main_process():
                 save_checkpoint(model_without_ddp, optimizer, scheduler, epoch, scaler, config)
         else:
-            val_status = eval_engine(model, val_loader, gpu_id, config)
+            val_status = eval_engine(model, model_without_ddp, val_loader, gpu_id, config)
             try:
                 inbatch_accuracy = float(val_status["inbatch_accuracy"])
             except ValueError:
                 print(f"Error: Expected a number but got '{val_status['inbatch_accuracy']}'")
                 inbatch_accuracy = 100.0
-            # Note: still save the model even if the in-batch accuracy is not the best
+             #Note: still save the model even if the in-batch accuracy is not the best
             if utils.is_main_process():
                 save_checkpoint(model_without_ddp, optimizer, scheduler, epoch, scaler, config)
             if inbatch_accuracy >= best_inbatch_accuracy:
@@ -193,6 +193,10 @@ def main(config):
     # Set up optimizer, and scaler
     # Apply different optimization strategies to different parameters
     # This is adapted from the UniVL-DR codebase
+    for n,p in model.named_parameters():
+        if 'vision_model' in n:
+            p.requires_grad = False
+
     exclude_condition = lambda n, p: p.ndim < 2 or any(sub in n for sub in ["batchnorm", "LayerNorm","norm","bn","bias", "temperature"])
     include_condition = lambda n, p: not exclude_condition(n, p)
 

@@ -12,12 +12,12 @@ data_config:
   val_query_data_path: query/union_val/mbeir_union_val.jsonl
 dataloader_config:
   num_workers: 2
-  train_batch_size: 4
-  valid_batch_size: 20
+  train_batch_size: 100
+  valid_batch_size: 120
 dist_config:
   dist_url: env://
 evaluator:
-  enable_eval: false
+  enable_eval: true
   eval_freq: 1
   print_freq: 10
 experiment:
